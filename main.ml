@@ -143,3 +143,9 @@ de Debruijn
 partie Sémentique (optionnelle), pour évaluer, on fait de la 
 gauche vers la droite (voir à 34:30 sur la video du TD)
 *)
+
+
+(*
+Parties demandées : 1 à 4
+paris 5 pas obligatoire
+*)
