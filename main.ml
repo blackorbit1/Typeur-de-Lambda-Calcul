@@ -1,4 +1,4 @@
-(* 
+2(* 
 
 Projet 1 - TAS
 
@@ -180,14 +180,27 @@ let ltrcbv_etape l =
 ;;
 
 
+(* === === === Exemple *)
+
+(* a2 : (λx.(x y)) (λx.x) *)
+ltrcbv_etape a2 ;;
+
+(*(λx.xx)*)
+let ox1 = cvar "x" ;;
+let oa1 = capp ox1 ox1 ;;
+let ol1 = clam "x" oa1 ;;
+
+(*(λx.xx)*)
+let ox2 = cvar "x" ;;
+let oa2 = capp ox2 ox2 ;;
+let ol2 = clam "x" oa1 ;;
+
+(* (λx.xx) (λx.xx) *)
+let omega = capp ol1 ol2 ;;
+
+ltrcbv_etape omega ;;
 
 
-(*
-let ltrcbv_etape_acc l acc = 
-;;
-*)
-
-(* func ltrcbv_etape(l lterme) lterme *)
 
 (* === === === Exo 2.3 *)
 
@@ -260,8 +273,6 @@ stype_egal t2_app2 t2_app2 ;; (* True *)
 
 stype_egal t2_var1 t2_var2 ;; (* False *)
 stype_egal t2_var1 t2_var1 ;; (* True *)
-
-
 
 
 
