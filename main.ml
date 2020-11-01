@@ -85,11 +85,11 @@ let rec barendregt_rec lterme remp = match lterme with
       with 
         Not_found -> cvar v
     )
-  | L {vari = v; corps = c} -> 
+  | L { vari = v; corps = c } -> 
       let nvari = fresh_var () in
       let new_remp = (RempMap.add v nvari remp) in
       clam nvari (barendregt_rec c new_remp)
-  | A {fpos = f; apos = a} -> 
+  | A { fpos = f; apos = a } -> 
       (* TODO : pk c'est pas : let remp1 = RempMap.fold remp_fold_func remp RempMap.empty in *)
       let remp1 = RempMap.fold remp_fold_func RempMap.empty remp in 
       let remp2 = RempMap.fold remp_fold_func RempMap.empty remp in
@@ -123,38 +123,60 @@ print_lterme (barendregt a2) ;;
 (* l -> string -> l -> l *)
 let rec instantie l x a = match l with
   | V v -> if v = x then a else cvar v
-  | L {vari = v; corps = c} -> clam v (instantie c x a)
-  | A {fpos = f; apos = ap} -> capp (instantie f x a) (instantie ap x a)
+  | L { vari = v ; corps = c } -> clam v (instantie c x a)
+  | A { fpos = f ; apos = ap } -> capp (instantie f x a) (instantie ap x a)
 ;;
 
 
 (* 
-er = "evaluer resultat"
+er = "résultat de l'évaluation"
 *)
-type er = content of { 
-  status :  string ; 
-  res :     l; 
-  rmem :    RempMap }
-;;
+type er = C of { 
+  status : string ;
+  res    : l ; 
+  rmem   : string RempMap.t
+} ;;
 
 let eval = ref 0 ;;
 
-(* l -> RempMap[string * string] -> l *)
-let ltrcbv_etape_rec l map = 
+(* l -> RempMap[string * string] -> (C : er) *)
+let rec ltrcbv_etape_rec l map = 
+  let resu = C { status = "KO" ; rmem = map ; res = l } in 
+  match l with
+    | A { fpos = f; apos = a } -> (*158*)
+      (match ltrcbv_etape_rec f map with
+        | C { status = "OK" ; res = r } -> (*160*) C { status = "OK" ; res = (capp r a) ; rmem = map } (*161*)
+        | C { res = r } (*164*) -> 
+          (match (f, ltrcbv_etape_rec a map) with (*165*)
+            | (_, C { status = "OK" }) -> (*166*) C { status = "OK" ; res = (capp f r) ; rmem = map }
+            | (L { vari = v ; corps = c }, _) -> C { status = "OK" ; res = (instantie c v a) ; rmem = map }
+            | (A { fpos = f2 ; apos = a2 }, _) -> (* rien \o/ *) C { status = "OK" ; res = l ; rmem = map }
+            | _ -> resu
+          )
+      )
+    | _ -> resu
 ;;
+
+(* er -> int -> l *)
+let rec ltrcbv_etape_loop er eval =
+  match (er, eval) with
+    | (C er, 1000) -> Format.printf "%s" "*** STOP : Trop de réductions ***" ; er.res
+    | (C er, _) ->
+      let eval = eval + 1 in
+      let nouveau = ltrcbv_etape_rec er.res er.rmem in 
+      match nouveau with
+        | C { status = "KO" } -> er.res
+        | C { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau eval
 
 (* l -> l *)
 let ltrcbv_etape l = 
   let l_barendregt = (barendregt l) in
   let map = RempMap.empty in
-  let c = 0 in
-  Format.printf "%s" l_barendregt ;
-  match !eval with
-    | 1000 -> Format.printf "%s" "*** STOP : Trop de réductions ***" ; eval := 0
-    | _ -> eval := !eval + 1 ; let nouveau = ltrcbv_rec l_barendregt map in match nouveau with
-      | content { status = "KO" } -> l
-      | content { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; 
-
+  Format.printf "%s" (print_lterme l_barendregt) ;
+  let nouveau = ltrcbv_etape_rec l_barendregt map in 
+  match nouveau with
+      | C { status = "KO" } -> l
+      | C { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau 0
 ;;
 
 
@@ -238,6 +260,8 @@ stype_egal t2_app2 t2_app2 ;; (* True *)
 
 stype_egal t2_var1 t2_var2 ;; (* False *)
 stype_egal t2_var1 t2_var1 ;; (* True *)
+
+
 
 
 
