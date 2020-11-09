@@ -1,4 +1,5 @@
-(* 
+(*  
+
 
 Projet 1 - TAS
 
@@ -11,33 +12,27 @@ DUTRA Enzo
 (* === === === Exo 2.1 *)
 
 
-(* 
-l = "lambda terme"
-V = value
-L = lambda
-A = application 
-*)
-type l =
-      V of string
-    | L of { vari : string ; corps : l }
-    | A of { fpos : l ; apos : l }
+type lambda_terme =
+    Value of string
+  | Lambda of { vari : string ; corps : lambda_terme }
+  | Application of { fpos : lambda_terme ; apos : lambda_terme }
 ;;
 
-(* l -> string *)
+(* lambda_terme -> string *)
 let rec print_lterme lterme = match lterme with
-  | V v -> v
-  | L {vari = v; corps = c} -> "λ" ^ v ^ "." ^ (print_lterme c)
-  | A {fpos = f; apos = a} -> "(" ^ (print_lterme f) ^ " " ^ (print_lterme a) ^ ")"
+  | Value v -> v
+  | Lambda {vari = v; corps = c} -> "λ" ^ v ^ "." ^ (print_lterme c)
+  | Application {fpos = f; apos = a} -> "(" ^ (print_lterme f) ^ " " ^ (print_lterme a) ^ ")"
 ;;
   
-(* string -> l *)
-let cvar str = (V str : l) ;;
+(* string -> lambda_terme *)
+let cvar str = (Value str : lambda_terme) ;;
 
-(* string, l -> l *)
-let clam str lambda = (L { vari = str ; corps = lambda } : l) ;;
+(* string, lambda_terme -> lambda_terme *)
+let clam str lambda = (Lambda { vari = str ; corps = lambda } : lambda_terme) ;;
 
-(* l, l -> l *)
-let capp lambda1 lambda2 = (A { fpos = lambda1 ; apos = lambda2 } : l) ;;
+(* lambda_terme, lambda_terme -> lambda_terme *)
+let capp lambda1 lambda2 = (Application { fpos = lambda1 ; apos = lambda2 } : lambda_terme) ;;
 
 (* === === === Exemples *)
 
@@ -77,26 +72,26 @@ the keys of all bindings in m (in increasing order), and d1 ... dN are
 the associated data.
 *)
 
-(* l -> remp -> l *)
+(* lambda_terme -> remp -> lambda_terme *)
 let rec barendregt_rec lterme remp = match lterme with
-  | V v -> (
+  | Value v -> (
       try 
         let nvari = (RempMap.find v remp) in cvar nvari
       with 
         Not_found -> cvar v
     )
-  | L { vari = v; corps = c } -> 
+  | Lambda { vari = v; corps = c } -> 
       let nvari = fresh_var () in
       let new_remp = (RempMap.add v nvari remp) in
       clam nvari (barendregt_rec c new_remp)
-  | A { fpos = f; apos = a } -> 
+  | Application { fpos = f; apos = a } -> 
       (* TODO : pk c'est pas : let remp1 = RempMap.fold remp_fold_func remp RempMap.empty in *)
       let remp1 = RempMap.fold remp_fold_func RempMap.empty remp in 
       let remp2 = RempMap.fold remp_fold_func RempMap.empty remp in
       capp (barendregt_rec f remp1) (barendregt_rec a remp2)
 ;;
 
-(* l -> l *)
+(* lambda_terme -> lambda_terme *)
 let barendregt lterme =
   let remp = RempMap.empty in barendregt_rec lterme remp ;;
 
@@ -120,63 +115,63 @@ print_lterme a2 ;;
 print_lterme (barendregt a2) ;;
 
 
-(* l -> string -> l -> l *)
+(* lambda_terme -> string -> lambda_terme -> lambda_terme *)
 let rec instantie l x a = match l with
-  | V v -> if v = x then a else cvar v
-  | L { vari = v ; corps = c } -> clam v (instantie c x a)
-  | A { fpos = f ; apos = ap } -> capp (instantie f x a) (instantie ap x a)
+  | Value v -> if v = x then a else cvar v
+  | Lambda { vari = v ; corps = c } -> clam v (instantie c x a)
+  | Application { fpos = f ; apos = ap } -> capp (instantie f x a) (instantie ap x a)
 ;;
 
 
 (* 
 er = "résultat de l'évaluation"
 *)
-type er = C of { 
-  status : string ;
-  res    : l ; 
-  rmem   : string RempMap.t
-} ;;
+type er = Content of { 
+    status : string ;
+    res    : lambda_terme ; 
+    rmem   : string RempMap.t
+  } ;;
 
 let eval = ref 0 ;;
 
-(* l -> RempMap[string * string] -> (C : er) *)
+(* lambda_terme -> RempMap[string * string] -> (Content : er) *)
 let rec ltrcbv_etape_rec l map = 
-  let resu = C { status = "KO" ; rmem = map ; res = l } in 
+  let resu = Content { status = "KO" ; rmem = map ; res = l } in
   match l with
-    | A { fpos = f; apos = a } -> (*158*)
+  | Application { fpos = f; apos = a } -> (*158*)
       (match ltrcbv_etape_rec f map with
-        | C { status = "OK" ; res = r } -> (*160*) C { status = "OK" ; res = (capp r a) ; rmem = map } (*161*)
-        | C { res = r } (*164*) -> 
-          (match (f, ltrcbv_etape_rec a map) with (*165*)
-            | (_, C { status = "OK" }) -> (*166*) C { status = "OK" ; res = (capp f r) ; rmem = map }
-            | (L { vari = v ; corps = c }, _) -> C { status = "OK" ; res = (instantie c v a) ; rmem = map }
-            | (A { fpos = f2 ; apos = a2 }, _) -> (* rien \o/ *) C { status = "OK" ; res = l ; rmem = map }
+       | Content { status = "OK" ; res = r } -> (*160*) Content { status = "OK" ; res = (capp r a) ; rmem = map } (*161*)
+       | Content { res = r } (*164*) -> 
+           (match (f, ltrcbv_etape_rec a map) with (*165*)
+            | (_, Content { status = "OK" }) -> (*166*) Content { status = "OK" ; res = (capp f r) ; rmem = map }
+            | (Lambda { vari = v ; corps = c }, _) -> Content { status = "OK" ; res = (instantie c v a) ; rmem = map }
+            | (Application { fpos = f2 ; apos = a2 }, _) -> (* rien \o/ *) Content { status = "OK" ; res = l ; rmem = map }
             | _ -> resu
-          )
+           )
       )
-    | _ -> resu
+  | _ -> resu
 ;;
 
-(* er -> int -> l *)
+(* er -> int -> lambda_terme *)
 let rec ltrcbv_etape_loop er eval =
   match (er, eval) with
-    | (C er, 1000) -> Format.printf "%s" "*** STOP : Trop de réductions ***" ; er.res
-    | (C er, _) ->
+  | (Content er, 1000) -> Format.printf "%s" "*** STOP : Trop de réductions ***" ; er.res
+  | (Content er, _) ->
       let eval = eval + 1 in
       let nouveau = ltrcbv_etape_rec er.res er.rmem in 
       match nouveau with
-        | C { status = "KO" } -> er.res
-        | C { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau eval
+      | Content { status = "KO" } -> er.res
+      | Content { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau eval
 
-(* l -> l *)
+(* lambda_terme -> lambda_terme *)
 let ltrcbv_etape l = 
   let l_barendregt = (barendregt l) in
   let map = RempMap.empty in
   Format.printf "%s" (print_lterme l_barendregt) ;
   let nouveau = ltrcbv_etape_rec l_barendregt map in 
   match nouveau with
-      | C { status = "KO" } -> l
-      | C { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau 0
+  | Content { status = "KO" } -> l
+  | Content { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau 0
 ;;
 
 
@@ -204,28 +199,23 @@ let omega = capp ol1 ol2 ;;
 
 (* === === === Exo 2.3 *)
 
-(* 
-s = syntaxe
-V = variable
-L = arguments
-A = resultat 
-*)
-type s =
-  V of string
-| A of { targ : s ; tres : s } 
+
+type syntaxe =
+    Value of string
+  | Application of { targ : syntaxe ; tres : syntaxe } 
 ;;
 
 
-(* string -> s *)
-let cSvar str = (V str : s) ;;
+(* string -> syntaxe *)
+let cSvar str = (Value str : syntaxe) ;;
 
-(* s, s -> s *)
-let cSapp stype1 stype2 = (A { targ = stype1 ; tres = stype2 } : s) ;;
+(* syntaxe, syntaxe -> syntaxe *)
+let cSapp stype1 stype2 = (Application { targ = stype1 ; tres = stype2 } : syntaxe) ;;
 
-(* s -> string *)
+(* syntaxe -> string *)
 let rec print_syntax s = match s with
-  | V v -> v
-  | A { targ = a ; tres = r } -> "(" ^ (print_syntax a) ^ ") → " ^ (print_syntax r)
+  | Value v -> v
+  | Application { targ = a ; tres = r } -> "(" ^ (print_syntax a) ^ ") → " ^ (print_syntax r)
 ;;
 
 (* === === === Exemples *)
@@ -257,12 +247,12 @@ let t2_app2 = cSapp t2_app1 t2_var3 ;;
 print_syntax t2_app2 ;;
 
 
-(* s -> s -> bool *)
+(* syntaxe -> syntaxe -> bool *)
 let rec stype_egal t1 t2 = match (t1, t2) with
-  | (V v, A a) -> false
-  | (A a, V v) -> false
-  | (V v1, V v2) -> v1 = v2
-  | (A { targ = a1 ; tres = r1 }, A { targ = a2 ; tres = r2 }) -> (stype_egal a1 a2) && (stype_egal r1 r2)
+  | (Value v, Application a) -> false
+  | (Application a, Value v) -> false
+  | (Value v1, Value v2) -> v1 = v2
+  | (Application { targ = a1 ; tres = r1 }, Application { targ = a2 ; tres = r2 }) -> (stype_egal a1 a2) && (stype_egal r1 r2)
 ;;
 
 (* === === === Exemples *)
@@ -276,6 +266,8 @@ stype_egal t2_var1 t2_var1 ;; (* True *)
 
 
 (* === === === Exo 2.4 *)
+<<<<<<< HEAD
+=======
 
 module Stype =
   struct (*implem*)
@@ -345,28 +337,73 @@ let rec gen_equas_rec map l s =
 let gen_equas map l s = let ur = gen_equas_rec map l s in ur.res
 ;;
 
+>>>>>>> e9dd63e430dbf332f5b580a7865aed11f2473d03
+
+module Stype =
+struct (*implem*)
+  type t = syntaxe [@@deriving ord]
+  let compare a b = 0
+end
 
 
-(* === === Visionnage de la video du TD3 de romain === === *)
+module StypeMap = Map.Make(String) ;;
+
+type t = Tequa of { tg : syntaxe ; td : syntaxe } ;;
+
+type unif_res =
+  (* status:
+  // "FINI" -> plus rien à faire
+	// "CONTINUE" -> on passe à l'équation suivante
+  // "RECOMMENCE" -> on a modifie les equations, on recommence
+  // "ECHEC" -> Explosion : occur_check ou constructeur incompatibles
+  // "GSUCCES" -> succes d'une generation d'equation
+  // "GECHEC" -> echec d'une generation d'equation *)
+    Ur of { res : t list ; status : string ; cause : string }
+;;
+
+(* syntaxe -> syntaxe -> syntaxe *)
+let ctarr t1 t2 = Application { targ = t1 ; tres = t2 } ;;
+
+(* string ->  StypeMap[string * Stype] -> StypeMap[string * Stype] -> StypeMap[string * Stype] *)
+let envi_fold_func key map acc = (StypeMap.add key (StypeMap.find key map) acc)
+
+(* StypeMap[string * Stype] -> lambda_terme -> syntaxe -> unif_res *)
+let rec gen_equas_rec map l s =
+  match (l : lambda_terme) with
+  | Value v -> (
+      try 
+        let resu = (StypeMap.find v map) in Ur { res = [(Tequa { tg = resu ; td = s })] ; status = "GSUCCES" ; cause = "" } 
+      with 
+        Not_found -> Ur { res = [](*Tequa*) ; status = "GECHEC" ; cause = "Pas de" ^ v ^ " dans l'environnement de typage." }
+    )
+  | Lambda { vari = v ; corps = c } -> 
+      let ta = cSvar (fresh_var ()) in
+      let tr = cSvar (fresh_var ()) in
+      let map = StypeMap.add v ta map in (* est ce qu'il faut pas faire un remplacement si y a déjà qqch à cette clé ? *)
+      let Ur resu1 = gen_equas_rec map c tr in
+      if resu1.status = "GECHEC" 
+      then Ur resu1
+      else Ur { res = Tequa { tg = s ; td = (ctarr ta tr) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
+  | Application { fpos = f; apos = a }  -> 
+      let ta = cSvar (fresh_var ()) in
+      let envi1 = StypeMap.fold envi_fold_func StypeMap.empty map in 
+      let envi2 = StypeMap.fold envi_fold_func StypeMap.empty map in
+      let Ur resuf = gen_equas_rec envi1 f (ctarr ta s) in
+      let Ur resua = gen_equas_rec envi2 a ta in
+      if resuf.status = "GECHEC" then Ur resuf else 
+      if resua.status = "GECHEC" then Ur resua else 
+        let equaf = resuf.res in
+        let equaa = resua.res in
+        Ur { res = (List.append equaf equaa) ; status = "GSUCCES" ; cause = "" }
+;;
+
+(* func gen_equas(envi map[string]Stype, l lterme, t Stype) []Tequa *)
+(* RempMap[string * Stype] -> lambda_terme -> s -> []Tequa *)
+let gen_equas map l s = let Ur ur = gen_equas_rec map l s in ur.res
+;;
 
 (*
-λx.M      --> AbsOfString * lterme
-M M       --> AppOf (lterme) * (lterme)
-*)
- 
-(* 
-Pour éviter de faire "qqch de syntaxique" cad changer
-les noms de variables à la voler pour pas que 2 variables
-différentes aient le meme nom, on peut regarder les indices 
-de Debruijn 
-*)
-
-(*
-partie Sémentique (optionnelle), pour évaluer, on fait de la 
-gauche vers la droite (voir à 34:30 sur la video du TD)
-*)
-
-(*
-Parties demandées : 1 à 4
-paris 5 pas obligatoire
+- arrêtez d'utiliser la même expression ("l", "s", ...) pour un terme et son type
+- faites du code qui respecte la convention de Barendregt, 
+- n'appelez pas deux variables liées avec le même nom ("res") dans la même fonction) vous pouvez me contacter sur discord.
 *)
