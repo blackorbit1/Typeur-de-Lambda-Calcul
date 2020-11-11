@@ -17,6 +17,8 @@ DUTRA Enzo
 
 (* === === === Exemples *)
 
+let empty_str = "" ;;
+
 let v1 = cvar "sd" ;;
 let v2 = cvar "hy" ;;
 let l1 = clam "az" v1 ;;
@@ -181,8 +183,8 @@ let t1_var1 = cSvar "A" ;;
 let t1_var2 = cSvar "B" ;;
 let t1_var3 = cSvar "C" ;;
 
-let t1_app2 = cSapp t1_var2 t1_var3 ;;
-let t1_app1 = cSapp t1_var1 t1_app2 ;;
+let t1_app2 = ctarr t1_var2 t1_var3 empty_str ;;
+let t1_app1 = ctarr t1_var1 t1_app2 empty_str ;;
 
 print_syntax t1_app1 ;;
 
@@ -194,8 +196,8 @@ let t2_var1 = cSvar "A" ;;
 let t2_var2 = cSvar "B" ;;
 let t2_var3 = cSvar "C" ;;
 
-let t2_app1 = cSapp t2_var1 t2_var2 ;;
-let t2_app2 = cSapp t2_app1 t2_var3 ;;
+let t2_app1 = ctarr t2_var1 t2_var2 empty_str ;;
+let t2_app2 = ctarr t2_app1 t2_var3 empty_str ;;
 
 print_syntax t2_app2 ;;
 
@@ -239,12 +241,12 @@ let rec gen_equas_rec map (l : lambda_terme) s =
       let Ur resu1 = gen_equas_rec map2 c tr in
       if resu1.status = "GECHEC" 
       then Ur resu1
-      else Ur { res = Tequa { tg = s ; td = (ctarr ta tr) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
+      else Ur { res = Tequa { tg = s ; td = (ctarr ta tr empty_str) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
   | Application { fpos = f; apos = a }  -> 
       let ta = cSvar (fresh_var ()) in
       let envi1 = StypeMap.fold envi_fold_func StypeMap.empty map in 
       let envi2 = StypeMap.fold envi_fold_func StypeMap.empty map in
-      let Ur resuf = gen_equas_rec envi1 f (ctarr ta s) in
+      let Ur resuf = gen_equas_rec envi1 f (ctarr ta s empty_str) in
       let Ur resua = gen_equas_rec envi2 a ta in
       if resuf.status = "GECHEC" then Ur resuf else 
       if resua.status = "GECHEC" then Ur resua else 
@@ -272,7 +274,7 @@ let rec occur_check v t = match t with
 let rec substitue v ts t = match t with
   | Value var -> if v = var then ts else t
   | Lambda { tres = r } -> ctlist (substitue v ts r)
-  | Application { targ = a ; tres = r } -> ctarr (substitue v ts a) (substitue v ts r)
+  | Application { targ = a ; tres = r } -> ctarr (substitue v ts a) (substitue v ts r) empty_str
 ;;
 
 (* string -> stype -> []t_equas -> []t_equas *)
@@ -284,18 +286,45 @@ let rec substitue_partout v ts (eqs : t_equas list) =
     neq :: substitue_partout v ts eqs_rest
 ;;
 
-let guess = ctvar "???" ;;
+let guess = cSvar "???" ;;
 
-(* func unification_etape(eqs []tequa, iint) unif_res *)
-(* t_equas -> int -> unif_res *)
+(* t_equas list -> int -> unif_res *)
 let unification_etape eqs i =
   if i >= (List.length eqs) then Ur { status = "FINI" ; res = eqs ; cause = "" } else
-  if 
+    let Tequa eqs_i = get_nth eqs i in
+    if eqs_i.tg = guess then Ur { status = "CONTINUE" ; res = eqs ; cause = "" } else
+    if eqs_i.td = guess then Ur { status = "CONTINUE" ; res = eqs ; cause = "" } else
+    if stype_egal eqs_i.tg eqs_i.td then 
+      let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
+      let nt = sublist 0 ((List.length eqs) - 1) nt in
+      Ur { status = "CONTINUE" ; res = nt ; cause = "" }
+    else match Tequa eqs_i with
+    | Tequa { tg = tg ; td = td } ->
+      if occur_check eqs_i.td.tvari eqs_i.td then
+        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" eqs_i.tg.tvari (print_syntaxe eqs_i.td) }
+      else
+        let subv = eqs_i.tg.tvari in
+        let subt = eqs_i.td in
+        let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
+        let nt = sublist 0 ((List.length eqs) - 1) nt in
+        Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
+    (*| (Value tg, Value td) -> *)
 
 
+
+
+(*
+  match (eqs_i.tg, eqs_i.td) with
+    | (V val, _) -> if eqs_i.tg = guess then { status = "CONTINUE" ; res = eqs ; cause = "" } else 
+    | (_, V val) -> if eqs_i.td = guess then { status = "CONTINUE" ; res = eqs ; cause = "" } else 
+    |
+*)
 ;;
 
+
 (* t_equas -> unif_res *)
+(*
 let unification eqs = 
 
 ;;
+*)

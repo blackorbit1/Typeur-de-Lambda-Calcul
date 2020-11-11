@@ -51,7 +51,7 @@ type er =
 type syntaxe =
   | Value of string
   | Lambda of { tres : syntaxe } (* TODO : A changer peut etre *)
-  | Application of { targ : syntaxe ; tres : syntaxe } 
+  | Application of { targ : syntaxe ; tres : syntaxe ; tvari : string } 
 ;;
 
 module Stype =
@@ -67,14 +67,11 @@ module StypeMap = Map.Make(String) ;;
 (* string -> syntaxe *)
 let cSvar str = (Value str : syntaxe) ;;
 
-(* syntaxe, syntaxe -> syntaxe *)
-let cSapp stype1 stype2 = (Application { targ = stype1 ; tres = stype2 } : syntaxe) ;;
-
 (* syntaxe -> syntaxe *)
 let ctlist stype = (Lambda { tres = stype } : syntaxe) ;;
 
-(* syntaxe -> syntaxe -> syntaxe *)
-let ctarr t1 t2 = (Application { targ = t1 ; tres = t2 } : syntaxe) ;;
+(* syntaxe -> syntaxe -> string -> syntaxe *)
+let ctarr t1 t2 str = (Application { targ = t1 ; tres = t2 ; tvari = str } : syntaxe) ;;
 
 
 (* syntaxe -> string *)
