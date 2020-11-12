@@ -46,13 +46,11 @@ let fresh_var () =
   var_counter := !var_counter + 1 ;
   "x" ^ string_of_int(!var_counter) ;;
 
-
-
 (* string ->  RempMap[string * string] -> RempMap[string * string] -> RempMap[string * string] *)
 let remp_fold_func key map acc = (RempMap.add key (RempMap.find key map) acc)
 
-(*        en fait c'est  ---->        acc     map   acc_res
-               fonc                   map     acc   acc_res
+(*
+               fonc                   acc     map   acc_res
             clé    map   acc res_acc
 val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 fold f m a computes (f kN dN ... (f k1 d1 a)...), where k1 ... kN are 
@@ -68,11 +66,11 @@ let rec barendregt_rec (lterme : lambda_terme) remp = match lterme with
       with 
         Not_found -> cvar v
     )
-  | Lambda { vari = v; corps = c } -> 
+  | Lambda { vari = v ; corps = c } -> 
       let nvari = fresh_var () in
       let new_remp = (RempMap.add v nvari remp) in
       clam nvari (barendregt_rec c new_remp)
-  | Application { fpos = f; apos = a } -> 
+  | Application { fpos = f ; apos = a } -> 
       (* TODO : pk c'est pas : let remp1 = RempMap.fold remp_fold_func remp RempMap.empty in *)
       let remp1 = RempMap.fold remp_fold_func RempMap.empty remp in 
       let remp2 = RempMap.fold remp_fold_func RempMap.empty remp in
@@ -81,7 +79,8 @@ let rec barendregt_rec (lterme : lambda_terme) remp = match lterme with
 
 (* lambda_terme -> lambda_terme *)
 let barendregt lterme =
-  let remp = RempMap.empty in barendregt_rec lterme remp ;;
+  let remp = RempMap.empty in barendregt_rec lterme remp
+;;
 
 (* === === === Exemples *)
 
@@ -233,9 +232,9 @@ let tvar_counter = ref 0 ;;
 (* () -> string *)
 let fresh_tvar () = 
   tvar_counter := !tvar_counter + 1 ;
-  "T" ^ string_of_int(!tvar_counter) ;;
+  "T" ^ string_of_int(!tvar_counter)
+;;
 
-  
 
 (* string ->  StypeMap[string * Stype] -> StypeMap[string * Stype] -> StypeMap[string * Stype] *)
 let envi_fold_func key map acc = (StypeMap.add key (StypeMap.find key map) acc)
@@ -258,7 +257,7 @@ let rec gen_equas_rec map (l : lambda_terme) s =
       if resu1.status = "GECHEC" 
       then Ur resu1
       else Ur { res = Tequa { tg = s ; td = (ctarr ta tr empty_str) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
-  | Application { fpos = f; apos = a }  -> 
+  | Application { fpos = f ; apos = a }  -> 
       let ta = cSvar (fresh_tvar ()) in
       let _ = debug ((print_syntax ta) ^ " = " ^ (print_lterme a) ^ "\n" ^ (print_syntax (ctarr ta s empty_str)) ^ " = " ^ (print_lterme f)) in
       let envi1 = StypeMap.fold envi_fold_func StypeMap.empty map in 
