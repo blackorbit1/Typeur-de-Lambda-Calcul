@@ -114,3 +114,9 @@ type typage_res =
   (* Tr of {status : string, res : syntaxe; cause : string} *)
   string * syntaxe * string
 ;;
+
+(* typage_res -> string *)
+let print_typage_res (tr : typage_res) = match tr with
+  | (status, res,  cause) -> "\nStatus : " ^ status ^ "\nResultat : " ^ (print_syntax res) ^ "\nCause : " ^ cause
+  (* | _ -> "typage_res malformé" *)
+;;

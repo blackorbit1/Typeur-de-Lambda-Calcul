@@ -21,3 +21,6 @@ let rec sublist b e l =
 (* https://stackoverflow.com/questions/37091784/ocaml-function-replace-a-element-in-a-list *)
 (* int -> a -> a list -> 'a list *)
 let replace pos a l = List.mapi (fun i x -> if i = pos then a else x) l ;;
+
+(* string -> () *)
+let debug str = if verbeux then Format.printf "\n%s" str else () ; () ;;

@@ -13,7 +13,7 @@ let rec recup_guess eq = match eq with
 
 (* StypeMap[string * Stype -> lambda_terme -> typage_res *)
 let typeur_envi envi l =
-  if verbeux then Format.printf "****** TYPAGE de %s ***" (print_lterme l) else () ;
+  if verbeux then Format.printf "\n****** TYPAGE de %s ***\n" (print_lterme l) else () ;
   (* >>> j'ai mis gen_equas_rec parce que gen_equas renvoie eqs.res -> a voir peut etre pk *)
   let Ur eqs = gen_equas_rec envi l guess in
   if eqs.status = "GECHEC" then
@@ -22,12 +22,12 @@ let typeur_envi envi l =
   else
     let Ur ures = unification eqs.res in
     if ures.status = "FINI" then
-      (* if verbeux then Format.printf "SUCCES Typage: |- %s : %s" (print_lterme l) (print_syntax recup_guess ures.res) else () ; *)
+      let _ = debug ("SUCCES Typage: |- " ^ (print_lterme l) ^ " : " ^ (print_syntax (recup_guess ures.res))) in
       let temp_res = recup_guess ures.res in
       (* Tr { status = "SUCCES" ; res = temp_res ; cause = eqs.cause } *)
       ("SUCCES", temp_res, eqs.cause)
     else
-      (* if verbeux then Format.printf "ECHEC Typage: %s parce que %s" (print_lterme l) ures.cause else () ;*)
+      let _ = debug ("nECHEC Typage: " ^ (print_lterme l) ^ " parce que " ^ ures.cause) in
       (* Tr { status = "ECHEC" ; res = [] ; cause = ures.cause } *)
       ("ECHEC", Value "", ures.cause)
 ;;

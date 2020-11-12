@@ -7,6 +7,11 @@ DUTRA Enzo
 
 *)
 
+(* Variables globales *)
+let max_unif = 1000 ;;
+let verbeux = true ;;
+
+(* Imports *)
 #use "types.ml" ;;
 #use "utils.ml" ;;
 
@@ -40,6 +45,7 @@ let var_counter = ref 0 ;;
 let fresh_var () = 
   var_counter := !var_counter + 1 ;
   "x" ^ string_of_int(!var_counter) ;;
+
 
 
 (* string ->  RempMap[string * string] -> RempMap[string * string] -> RempMap[string * string] *)
@@ -222,6 +228,15 @@ stype_egal t2_var1 t2_var1 ;; (* True *)
 
 (* === === === Exo 2.4 *)
 
+let tvar_counter = ref 0 ;;
+
+(* () -> string *)
+let fresh_tvar () = 
+  tvar_counter := !tvar_counter + 1 ;
+  "T" ^ string_of_int(!tvar_counter) ;;
+
+  
+
 (* string ->  StypeMap[string * Stype] -> StypeMap[string * Stype] -> StypeMap[string * Stype] *)
 let envi_fold_func key map acc = (StypeMap.add key (StypeMap.find key map) acc)
 
@@ -232,18 +247,18 @@ let rec gen_equas_rec map (l : lambda_terme) s =
       try 
         let resu = (StypeMap.find v map) in Ur { res = [(Tequa { tg = resu ; td = s })] ; status = "GSUCCES" ; cause = "" } 
       with 
-        Not_found -> Ur { res = [](*Tequa*) ; status = "GECHEC" ; cause = "Pas de" ^ v ^ " dans l'environnement de typage." }
+        Not_found -> Ur { res = [](*Tequa*) ; status = "GECHEC" ; cause = "Pas de " ^ v ^ " dans l'environnement de typage." }
     )
   | Lambda { vari = v ; corps = c } -> 
-      let ta = cSvar (fresh_var ()) in
-      let tr = cSvar (fresh_var ()) in
+      let ta = cSvar (fresh_tvar ()) in
+      let tr = cSvar (fresh_tvar ()) in
       let map2 = StypeMap.add v ta map in (* est ce qu'il faut pas faire un remplacement si y a déjà qqch à cette clé ? *)
       let Ur resu1 = gen_equas_rec map2 c tr in
       if resu1.status = "GECHEC" 
       then Ur resu1
       else Ur { res = Tequa { tg = s ; td = (ctarr ta tr empty_str) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
   | Application { fpos = f; apos = a }  -> 
-      let ta = cSvar (fresh_var ()) in
+      let ta = cSvar (fresh_tvar ()) in
       let envi1 = StypeMap.fold envi_fold_func StypeMap.empty map in 
       let envi2 = StypeMap.fold envi_fold_func StypeMap.empty map in
       let Ur resuf = gen_equas_rec envi1 f (ctarr ta s empty_str) in
@@ -262,121 +277,49 @@ let gen_equas map l s = let Ur ur = gen_equas_rec map l s in ur.res
 
 (* === === === Exo 2.5 *)
 
-
-(* string -> stype -> bool *)
-let rec occur_check v t = match t with
-  | Value var -> v = var
-  | Lambda { tres = r }  -> occur_check v r
-  | Application { targ = a ; tres = r }  -> (occur_check v a) || (occur_check v r)
-;;
-
-(* string -> syntaxe -> syntaxe -> syntaxe *)
-let rec substitue v ts t = match t with
-  | Value var -> if v = var then ts else t
-  | Lambda { tres = r } -> ctlist (substitue v ts r)
-  | Application { targ = a ; tres = r } -> ctarr (substitue v ts a) (substitue v ts r) empty_str
-;;
-
-(* string -> stype -> []t_equas -> []t_equas *)
-let rec substitue_partout v ts (eqs : t_equas list) = 
-  match eqs with
-  | [] -> []
-  | Tequa eq :: eqs_rest -> 
-    let neq = Tequa { tg = (substitue v ts eq.tg) ; td = (substitue v ts eq.td) } in
-    neq :: substitue_partout v ts eqs_rest
-;;
-
-let guess = cSvar "???" ;;
-
-(* t_equas list -> int -> unif_res *)
-let unification_etape eqs i =
-  if i >= (List.length eqs) then Ur { status = "FINI" ; res = eqs ; cause = "" } else
-    let Tequa eqs_i = get_nth eqs i in
-    if eqs_i.tg = guess then Ur { status = "CONTINUE" ; res = eqs ; cause = "" } else
-    if eqs_i.td = guess then Ur { status = "CONTINUE" ; res = eqs ; cause = "" } else
-    if stype_egal eqs_i.tg eqs_i.td then 
-      let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
-      let nt = sublist 0 ((List.length eqs) - 1) nt in
-      Ur { status = "CONTINUE" ; res = nt ; cause = "" }
-    else match Tequa eqs_i with
-    | Tequa { tg = tg ; td = td } ->
-      match (eqs_i.tg, eqs_i.td) with
-      | (Value v, Application {tvari = td_tvari}) -> 
-        if occur_check v eqs_i.td then (* est ce qu'on ne doit pas mettre eqs_i.tg à la place de v ? *)
-          Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" v (print_syntax eqs_i.td) }
-        else
-          let subv = v in
-          let subt = eqs_i.td in
-          let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
-          let nt = sublist 0 ((List.length eqs) - 1) nt in
-          Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
-      | (Application {tvari = tg_tvari}, Value v) -> 
-        if occur_check v eqs_i.tg then
-          Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" v (print_syntax eqs_i.tg) }
-        else
-          let subv = v in
-          let subt = eqs_i.tg in
-          let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
-          let nt = sublist 0 ((List.length eqs) - 1) nt in
-          Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
-      | (Application {targ = tg_targ ; tres = tg_tres ; tvari = tg_tvari}, Application {targ = td_targ ; tres = td_tres ; tvari = td_tvari}) -> 
-        let eq1 = Tequa { tg = tg_targ ; td = td_targ } in
-        let eq2 = Tequa { tg = tg_tres ; td = td_tres } in
-        let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
-        let nt = sublist 0 ((List.length eqs) - 1) nt in
-        Ur { status = "RECOMMENCE" ; res = eq1::eq2::nt ; cause = "" }
-      | (Application {tvari = tg_tvari}, _) -> 
-        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Type fleche %s incompatible avec %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
-      | (Lambda {tres = tg_tres}, Lambda {tres = td_tres}) -> 
-        let eq1 = Tequa { tg = tg_tres ; td = td_tres } in
-        let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
-        let nt = sublist 0 ((List.length eqs) - 1) nt in
-        Ur { status = "RECOMMENCE" ; res = eq1::nt ; cause = "" }
-      | (Lambda {tres = tg_tres}, _) -> 
-        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Type Liste %s incompatible avec %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
-      | (_, _) -> 
-        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Cas d'Unification non pris en charge. Types à traiter : %s et %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
-
-    (*
-    | (_ , Value td) -> match (eqs_i.tg, eqs_i.td) with
-      | (Application {tvari = tg_tvari}, Application {tvari = td_tvari}) -> 
-    *)
+#use "unification.ml" ;;
+(* occur_check :        string -> stype -> bool *)
+(* substitue :          string -> syntaxe -> syntaxe -> syntaxe *)
+(* substitue_partout :  string -> stype -> []t_equas -> []t_equas *)
 
 
-
-
-(*
-  match (eqs_i.tg, eqs_i.td) with
-    | (V val, _) -> if eqs_i.tg = guess then { status = "CONTINUE" ; res = eqs ; cause = "" } else 
-    | (_, V val) -> if eqs_i.td = guess then { status = "CONTINUE" ; res = eqs ; cause = "" } else 
-    |
-*)
-;;
-
-let max_unif = 1000 ;;
-let verbeux = true ;;
-
-(* t_equas -> int -> int -> unif_res *)
-let rec unification eqs i c =
-  let Ur resu = unification_etape eqs i in
-  if verbeux then Format.printf "Indice :%d\nEquations:\n%s" (i) (print_tequas eqs) else () ;
-  if c = max_unif then Ur { status = "EXPIRE" ; res = [] ; cause = "" }
-  else match resu.status with
-    | "CONTINUE" -> unification resu.res (i+1) (c+1)
-    | "RECOMMENCE" -> unification resu.res 0 (c+1)
-    | "ECHEC" -> Ur resu
-    | "FINI" -> Ur resu
-    | _ -> Ur { status = "ECHEC" ; res = [] ; cause = "Problème de nommage de status" }
-;;
-
-(* t_equas -> unif_res *)
-let unification eqs = 
-  let i = 0 in let c = 0 in
-  if verbeux then Format.printf "Indice :%d\nEquations:\n%s" (i) (print_tequas eqs) else () ;
-  unification eqs i c
-;;
-
-
-
-(* !!!!!! A UTILISER PLUS TARD !!!!!! *)
 #use "typeur.ml" ;;
+(* recup_guess :        Tequa list -> stype *)
+(* typeur_envi :        StypeMap[string * Stype -> lambda_terme -> typage_res *)
+(* typeur :             lambda_terme -> typage_res *)
+(* unification_etape :  t_equas list -> int -> unif_res *)
+(* unification_rec :    t_equas -> int -> int -> unif_res *)
+(* unification :        t_equas -> unif_res *)
+
+
+(* === === === Exemples *)
+
+(* (x y) *)
+(* debug (print_typage_res (typeur a1)) ;; *)
+
+(* (λx.(x y)) (λx.x) *)
+(* debug (print_typage_res (typeur a2)) ;; *)
+
+(* (λy.(λx.(x y))) (λx.x) *)
+let a3 = clam "y" a2 ;;
+(* debug (print_typage_res (typeur a3)) ;; *)
+
+
+(* I *)
+let ex_id = clam "x" (cvar "x") ;;
+
+(* K *)
+let ex_k = clam "x" (clam "y" (cvar "x")) ;;
+
+(* S *)
+let ex_s = clam "x" (clam "y" (clam "z" (capp (capp (cvar "x") (cvar "z")) (capp (cvar "y") (cvar "z"))))) ;;
+
+(* SKK *)
+let ex_skk = capp (capp ex_s ex_k) ex_k ;;
+
+
+(* SKK : ((λx.λy.λz.((x z) (y z)) λx.λy.x) λx.λy.x) *)
+debug (print_typage_res (typeur ex_skk)) ;;
+
+
+Format.printf "\n" ;;
