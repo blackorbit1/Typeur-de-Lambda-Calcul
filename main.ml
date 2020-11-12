@@ -300,15 +300,47 @@ let unification_etape eqs i =
       Ur { status = "CONTINUE" ; res = nt ; cause = "" }
     else match Tequa eqs_i with
     | Tequa { tg = tg ; td = td } ->
-      if occur_check eqs_i.td.tvari eqs_i.td then
-        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" eqs_i.tg.tvari (print_syntaxe eqs_i.td) }
-      else
-        let subv = eqs_i.tg.tvari in
-        let subt = eqs_i.td in
+      match (eqs_i.tg, eqs_i.td) with
+      | (Value v, Application {tvari = td_tvari}) -> 
+        if occur_check v eqs_i.td then (* est ce qu'on ne doit pas mettre eqs_i.tg à la place de v ? *)
+          Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" v (print_syntax eqs_i.td) }
+        else
+          let subv = v in
+          let subt = eqs_i.td in
+          let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
+          let nt = sublist 0 ((List.length eqs) - 1) nt in
+          Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
+      | (Application {tvari = tg_tvari}, Value v) -> 
+        if occur_check v eqs_i.tg then
+          Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" v (print_syntax eqs_i.tg) }
+        else
+          let subv = v in
+          let subt = eqs_i.tg in
+          let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
+          let nt = sublist 0 ((List.length eqs) - 1) nt in
+          Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
+      | (Application {targ = tg_targ ; tres = tg_tres ; tvari = tg_tvari}, Application {targ = td_targ ; tres = td_tres ; tvari = td_tvari}) -> 
+        let eq1 = Tequa { tg = tg_targ ; td = td_targ } in
+        let eq2 = Tequa { tg = tg_tres ; td = td_tres } in
         let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
         let nt = sublist 0 ((List.length eqs) - 1) nt in
-        Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
-    (*| (Value tg, Value td) -> *)
+        Ur { status = "RECOMMENCE" ; res = eq1::eq2::nt ; cause = "" }
+      | (Application {tvari = tg_tvari}, _) -> 
+        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Type fleche %s incompatible avec %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
+      | (Lambda {tres = tg_tres}, Lambda {tres = td_tres}) -> 
+        let eq1 = Tequa { tg = tg_tres ; td = td_tres } in
+        let nt = replace i (get_nth eqs ((List.length eqs) - 1)) eqs in
+        let nt = sublist 0 ((List.length eqs) - 1) nt in
+        Ur { status = "RECOMMENCE" ; res = eq1::nt ; cause = "" }
+      | (Lambda {tres = tg_tres}, _) -> 
+        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Type Liste %s incompatible avec %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
+      | (_, _) -> 
+        Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Cas d'Unification non pris en charge. Types à traiter : %s et %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
+
+    (*
+    | (_ , Value td) -> match (eqs_i.tg, eqs_i.td) with
+      | (Application {tvari = tg_tvari}, Application {tvari = td_tvari}) -> 
+    *)
 
 
 
@@ -321,10 +353,30 @@ let unification_etape eqs i =
 *)
 ;;
 
+let max_unif = 1000 ;;
+let verbeux = true ;;
+
+(* t_equas -> int -> int -> unif_res *)
+let rec unification eqs i c =
+  let Ur resu = unification_etape eqs i in
+  if verbeux then Format.printf "Indice :%d\nEquations:\n%s" (i) (print_tequas eqs) else () ;
+  if c = max_unif then Ur { status = "EXPIRE" ; res = [] ; cause = "" }
+  else match resu.status with
+    | "CONTINUE" -> unification resu.res (i+1) (c+1)
+    | "RECOMMENCE" -> unification resu.res 0 (c+1)
+    | "ECHEC" -> Ur resu
+    | "FINI" -> Ur resu
+    | _ -> Ur { status = "ECHEC" ; res = [] ; cause = "Problème de nommage de status" }
+;;
 
 (* t_equas -> unif_res *)
-(*
 let unification eqs = 
-
+  let i = 0 in let c = 0 in
+  if verbeux then Format.printf "Indice :%d\nEquations:\n%s" (i) (print_tequas eqs) else () ;
+  unification eqs i c
 ;;
-*)
+
+
+
+(* !!!!!! A UTILISER PLUS TARD !!!!!! *)
+#use "typeur.ml" ;;

@@ -54,6 +54,7 @@ type syntaxe =
   | Application of { targ : syntaxe ; tres : syntaxe ; tvari : string } 
 ;;
 
+
 module Stype =
 struct (*implem*)
   type t = syntaxe [@@deriving ord]
@@ -85,6 +86,10 @@ let rec print_syntax s = match s with
 
 type t_equas = Tequa of { tg : syntaxe ; td : syntaxe } ;;
 
+let rec print_tequas eqs = match eqs with 
+  | (Tequa h)::t -> (print_syntax h.tg) ^ " = " ^ (print_syntax h.td) ^ "\n" ^ (print_tequas t)
+  | [] -> ""
+
 (* === === === Résultat d'unification === === === *)
 
 type unif_res =
@@ -96,4 +101,16 @@ type unif_res =
   // "GSUCCES" -> succes d'une generation d'equation
   // "GECHEC" -> echec d'une generation d'equation *)
     Ur of { res : t_equas list ; status : string ; cause : string }
+;;
+
+(* === === === Résultat du typeur === === === *)
+
+type typage_res =
+  (*
+  status : SUCCES ou ECHEC
+	res    : type trouvé, si SUCCES
+  cause  : cause d'échec, si ECHEC
+  *)
+  (* Tr of {status : string, res : syntaxe; cause : string} *)
+  string * syntaxe * string
 ;;
