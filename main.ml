@@ -252,6 +252,7 @@ let rec gen_equas_rec map (l : lambda_terme) s =
   | Lambda { vari = v ; corps = c } -> 
       let ta = cSvar (fresh_tvar ()) in
       let tr = cSvar (fresh_tvar ()) in
+      let _ = debug ((print_syntax ta) ^ " = " ^ v ^ "\n" ^ (print_syntax tr) ^ " = " ^ (print_lterme c)) in
       let map2 = StypeMap.add v ta map in (* est ce qu'il faut pas faire un remplacement si y a déjà qqch à cette clé ? *)
       let Ur resu1 = gen_equas_rec map2 c tr in
       if resu1.status = "GECHEC" 
@@ -259,6 +260,7 @@ let rec gen_equas_rec map (l : lambda_terme) s =
       else Ur { res = Tequa { tg = s ; td = (ctarr ta tr empty_str) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
   | Application { fpos = f; apos = a }  -> 
       let ta = cSvar (fresh_tvar ()) in
+      let _ = debug ((print_syntax ta) ^ " = " ^ (print_lterme a) ^ "\n" ^ (print_syntax (ctarr ta s empty_str)) ^ " = " ^ (print_lterme f)) in
       let envi1 = StypeMap.fold envi_fold_func StypeMap.empty map in 
       let envi2 = StypeMap.fold envi_fold_func StypeMap.empty map in
       let Ur resuf = gen_equas_rec envi1 f (ctarr ta s empty_str) in
@@ -321,5 +323,11 @@ let ex_skk = capp (capp ex_s ex_k) ex_k ;;
 (* SKK : ((λx.λy.λz.((x z) (y z)) λx.λy.x) λx.λy.x) *)
 debug (print_typage_res (typeur ex_skk)) ;;
 
+
+
+
+let liste = get_last_poped_to_i [5;6;7;1;9;4] 3 ;;
+
+debug (String.concat " " (List.map string_of_int liste)) ;;
 
 Format.printf "\n" ;;
