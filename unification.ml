@@ -38,9 +38,14 @@ let unification_etape eqs i =
     let nt = get_last_poped_to_i eqs i in
     Ur { status = "CONTINUE" ; res = nt ; cause = "" }
   else match Tequa eqs_i with
-  | Tequa { tg = tg ; td = td } ->
+  | Tequa { tg = _ ; td = _ } -> (* sert juste à assurer qu'on a du Tequa *)
     match (eqs_i.tg, eqs_i.td) with
-    | (Value v, Application { tvari = td_tvari }) -> 
+    | (Value vg, Value vd) -> 
+      let subv = vg in
+      let subt = eqs_i.td in
+      let nt = get_last_poped_to_i eqs i in
+      Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
+    | (Value v, _) -> 
       if occur_check v eqs_i.td then 
         Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" v (print_syntax eqs_i.td) }
       else
@@ -48,12 +53,8 @@ let unification_etape eqs i =
         let subt = eqs_i.td in
         let nt = get_last_poped_to_i eqs i in
         Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
-    | (Value v, _) -> 
-      let subv = v in
-      let subt = eqs_i.td in
-      let nt = get_last_poped_to_i eqs i in
-      Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
-    | (Application { tvari = tg_tvari }, Value v) -> 
+  
+    | (_, Value v) -> 
       if occur_check v eqs_i.tg then
         Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Variable %s présente dans %s" v (print_syntax eqs_i.tg) }
       else
@@ -61,11 +62,7 @@ let unification_etape eqs i =
         let subt = eqs_i.tg in
         let nt = get_last_poped_to_i eqs i in
         Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
-    | (_, Value v) -> 
-      let subv = v in
-      let subt = eqs_i.tg in
-      let nt = get_last_poped_to_i eqs i in
-      Ur { status = "RECOMMENCE" ; res = (substitue_partout subv subt nt) ; cause = "" }
+    
     | (Application { targ = tg_targ ; tres = tg_tres ; tvari = tg_tvari }, Application { targ = td_targ ; tres = td_tres ; tvari = td_tvari }) -> 
       let eq1 = Tequa { tg = tg_targ ; td = td_targ } in
       let eq2 = Tequa { tg = tg_tres ; td = td_tres } in
@@ -89,7 +86,7 @@ let unification_etape eqs i =
 (* t_equas list -> int -> int -> unif_res *)
 let rec unification_rec eqs i c =
   let Ur resu = unification_etape eqs i in
-  (* let _ = debug ("Indice :" ^ (string_of_int i) ^ "\nEquations:\n" ^ (print_tequas eqs)) in *)
+  let _ = debug ("Indice :" ^ (string_of_int i) ^ "\nEquations:\n" ^ (print_tequas eqs)) in
   if c = max_unif then Ur { status = "EXPIRE" ; res = [] ; cause = "" }
   else match resu.status with
     | "CONTINUE" -> unification_rec resu.res (i + 1) (c + 1)

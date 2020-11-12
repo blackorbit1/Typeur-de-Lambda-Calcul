@@ -46,10 +46,12 @@ let fresh_var () =
   var_counter := !var_counter + 1 ;
   "x" ^ string_of_int(!var_counter) ;;
 
-(* string ->  RempMap[string * string] -> RempMap[string * string] -> RempMap[string * string] *)
-let remp_fold_func key map acc = (RempMap.add key (RempMap.find key map) acc)
 
-(*
+
+(* string ->  RempMap[string * string] -> RempMap[string * string] -> RempMap[string * string] *)
+let remp_fold_func key map acc = (RempMap.add key (RempMap.find key map) acc) ;;
+
+(* 
                fonc                   acc     map   acc_res
             clé    map   acc res_acc
 val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
@@ -70,7 +72,7 @@ let rec barendregt_rec (lterme : lambda_terme) remp = match lterme with
       let nvari = fresh_var () in
       let new_remp = (RempMap.add v nvari remp) in
       clam nvari (barendregt_rec c new_remp)
-  | Application { fpos = f ; apos = a } -> 
+  | Application { fpos = f; apos = a } -> 
       (* TODO : pk c'est pas : let remp1 = RempMap.fold remp_fold_func remp RempMap.empty in *)
       let remp1 = RempMap.fold remp_fold_func RempMap.empty remp in 
       let remp2 = RempMap.fold remp_fold_func RempMap.empty remp in
@@ -79,7 +81,7 @@ let rec barendregt_rec (lterme : lambda_terme) remp = match lterme with
 
 (* lambda_terme -> lambda_terme *)
 let barendregt lterme =
-  let remp = RempMap.empty in barendregt_rec lterme remp
+  let remp = RempMap.empty in barendregt_rec lterme remp 
 ;;
 
 (* === === === Exemples *)
@@ -232,9 +234,10 @@ let tvar_counter = ref 0 ;;
 (* () -> string *)
 let fresh_tvar () = 
   tvar_counter := !tvar_counter + 1 ;
-  "T" ^ string_of_int(!tvar_counter)
+  "T" ^ string_of_int(!tvar_counter) 
 ;;
 
+  
 
 (* string ->  StypeMap[string * Stype] -> StypeMap[string * Stype] -> StypeMap[string * Stype] *)
 let envi_fold_func key map acc = (StypeMap.add key (StypeMap.find key map) acc)
@@ -326,7 +329,9 @@ debug (print_typage_res (typeur ex_skk)) ;;
 
 
 let liste = get_last_poped_to_i [5;6;7;1;9;4] 3 ;;
-
 debug (String.concat " " (List.map string_of_int liste)) ;;
+
+let nth = get_nth [5;6;7;1;9;4] 2 ;;
+debug (string_of_int nth) ;;
 
 Format.printf "\n" ;;
