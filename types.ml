@@ -1,6 +1,6 @@
 (* === === === lambda terme === === === *)
 
-(* type *)
+(* === type *)
 
 type lambda_terme =
   | Value of string
@@ -8,7 +8,7 @@ type lambda_terme =
   | Application of { fpos : lambda_terme ; apos : lambda_terme }
 ;;
 
-(* constructeurs *)
+(* === constructeurs *)
 
 (* string -> lambda_terme *)
 let cvar str = (Value str : lambda_terme) ;;
@@ -20,7 +20,7 @@ let clam str lambda = (Lambda { vari = str ; corps = lambda } : lambda_terme) ;;
 let capp lambda1 lambda2 = (Application { fpos = lambda1 ; apos = lambda2 } : lambda_terme) ;;
 
 
-(* affichage *)
+(* === utilitaires *)
 
 (* lambda_terme -> string *)
 let rec print_lterme lterme = match lterme with
@@ -46,14 +46,13 @@ type er =
 
 (* === === === Syntaxe === === === *)
 
-(* type *)
+(* === type *)
 
 type syntaxe =
   | Value of string
   | Lambda of { tres : syntaxe } (* TODO : A changer peut etre *)
   | Application of { targ : syntaxe ; tres : syntaxe ; tvari : string } 
 ;;
-
 
 module Stype =
 struct (*implem*)
@@ -63,7 +62,8 @@ end
 
 module StypeMap = Map.Make(String) ;;
 
-(* constructeurs *)
+
+(* === constructeurs *)
 
 (* string -> syntaxe *)
 let cSvar str = (Value str : syntaxe) ;;
@@ -75,11 +75,21 @@ let ctlist stype = (Lambda { tres = stype } : syntaxe) ;;
 let ctarr t1 t2 str = (Application { targ = t1 ; tres = t2 ; tvari = str } : syntaxe) ;;
 
 
+(* === utilitaires *)
+
 (* syntaxe -> string *)
 let rec print_syntax s = match s with
   | Value v -> v
   | Lambda { tres = t } -> "[" ^ (print_syntax t) ^ "]"
   | Application { targ = a ; tres = r } -> "(" ^ (print_syntax a) ^ ") → " ^ (print_syntax r)
+;;
+
+(* syntaxe -> syntaxe -> bool *)
+let rec stype_egal (t1 : syntaxe) (t2 : syntaxe) = match (t1, t2) with
+  | (Value v1, Value v2) -> v1 = v2
+  | (Lambda { tres = r1 }, Lambda { tres = r2 }) -> stype_egal r1 r2
+  | (Application { targ = a1 ; tres = r1 }, Application { targ = a2 ; tres = r2 }) -> (stype_egal a1 a2) && (stype_egal r1 r2)
+  | (_, _) -> false
 ;;
 
 (* === === === Génération d'équations === === === *)

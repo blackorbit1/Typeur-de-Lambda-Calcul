@@ -23,4 +23,4 @@ let rec sublist b e l =
 let replace pos a l = List.mapi (fun i x -> if i = pos then a else x) l ;;
 
 (* string -> () *)
-let debug str = if verbeux then Format.printf "\n%s" ; () str else () ;;
+let debug str = if verbeux then Format.printf "\n%s" str else () ;;

@@ -18,10 +18,8 @@ let rec substitue_partout v ts (eqs : t_equas list) =
   | [] -> []
   | Tequa eq :: eqs_rest -> 
     let neq = Tequa { tg = (substitue v ts eq.tg) ; td = (substitue v ts eq.td) } in
-    neq :: substitue_partout v ts eqs_rest
+    [neq] @ (substitue_partout v ts eqs_rest)
 ;;
-
-let guess = cSvar "???" ;;
 
 let get_last_poped_to_i l i = 
   let tmp = replace i (get_nth l ((List.length l) - 1)) l in
@@ -67,21 +65,19 @@ let unification_etape eqs i =
       let eq1 = Tequa { tg = tg_targ ; td = td_targ } in
       let eq2 = Tequa { tg = tg_tres ; td = td_tres } in
       let nt = get_last_poped_to_i eqs i in
-      Ur { status = "RECOMMENCE" ; res = eq1::eq2::nt ; cause = "" }
+      Ur { status = "RECOMMENCE" ; res = nt @ [eq1] @ [eq2] ; cause = "" }
     | (Application { tvari = tg_tvari }, _) -> 
       Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Type fleche %s incompatible avec %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
     | (Lambda { tres = tg_tres }, Lambda { tres = td_tres }) -> 
       let eq1 = Tequa { tg = tg_tres ; td = td_tres } in
       let nt = get_last_poped_to_i eqs i in
-      Ur { status = "RECOMMENCE" ; res = eq1::nt ; cause = "" }
+      Ur { status = "RECOMMENCE" ; res = nt @ [eq1] ; cause = "" }
     | (Lambda { tres = tg_tres }, _) -> 
       Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Type Liste %s incompatible avec %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
     | (_, _) -> 
       Ur { status = "ECHEC" ; res = [] ; cause = Printf.sprintf "Cas d'Unification non pris en charge. Types à traiter : %s et %s" (print_syntax eqs_i.tg) (print_syntax eqs_i.td) }
     (* est ce qu'on ne devrait pas avoir de "(_, Lambda {tres = tg_tres}) ->" ? *)
 ;;
-
-
 
 (* t_equas list -> int -> int -> unif_res *)
 let rec unification_rec eqs i c =
@@ -102,4 +98,3 @@ let unification eqs =
   let _ = debug ("Indice :" ^ (string_of_int i) ^ "\nEquations:\n" ^ (print_tequas eqs)) in
   unification_rec eqs i c
 ;;
-

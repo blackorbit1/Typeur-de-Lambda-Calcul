@@ -38,53 +38,9 @@ print_lterme a1 ;;
 
 (* === === === Exo 2.2 *)
 
+# use "evaluation.ml" ;;
 
-let var_counter = ref 0 ;;
-
-(* () -> string *)
-let fresh_var () = 
-  var_counter := !var_counter + 1 ;
-  "x" ^ string_of_int(!var_counter) ;;
-
-
-
-(* string ->  RempMap[string * string] -> RempMap[string * string] -> RempMap[string * string] *)
-let remp_fold_func key map acc = (RempMap.add key (RempMap.find key map) acc) ;;
-
-(* 
-               fonc                   acc     map   acc_res
-            clé    map   acc res_acc
-val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-fold f m a computes (f kN dN ... (f k1 d1 a)...), where k1 ... kN are 
-the keys of all bindings in m (in increasing order), and d1 ... dN are 
-the associated data.
-*)
-
-(* lambda_terme -> remp -> lambda_terme *)
-let rec barendregt_rec (lterme : lambda_terme) remp = match lterme with
-  | Value v -> (
-      try 
-        let nvari = (RempMap.find v remp) in cvar nvari
-      with 
-        Not_found -> cvar v
-    )
-  | Lambda { vari = v ; corps = c } -> 
-      let nvari = fresh_var () in
-      let new_remp = (RempMap.add v nvari remp) in
-      clam nvari (barendregt_rec c new_remp)
-  | Application { fpos = f; apos = a } -> 
-      (* TODO : pk c'est pas : let remp1 = RempMap.fold remp_fold_func remp RempMap.empty in *)
-      let remp1 = RempMap.fold remp_fold_func RempMap.empty remp in 
-      let remp2 = RempMap.fold remp_fold_func RempMap.empty remp in
-      capp (barendregt_rec f remp1) (barendregt_rec a remp2)
-;;
-
-(* lambda_terme -> lambda_terme *)
-let barendregt lterme =
-  let remp = RempMap.empty in barendregt_rec lterme remp 
-;;
-
-(* === === === Exemples *)
+(* === === === Exemples Barendregt *)
 
 (* On construit l'expression suivante : (λx.xy) (λx.x) *)
 (* λx.(x y) *)
@@ -104,58 +60,7 @@ print_lterme a2 ;;
 print_lterme (barendregt a2) ;;
 
 
-(* lambda_terme -> string -> lambda_terme -> lambda_terme *)
-let rec instantie (l : lambda_terme) x a = match l with
-  | Value v -> if v = x then a else cvar v
-  | Lambda { vari = v ; corps = c } -> clam v (instantie c x a)
-  | Application { fpos = f ; apos = ap } -> capp (instantie f x a) (instantie ap x a)
-;;
-
-
-let eval = ref 0 ;;
-
-(* lambda_terme -> RempMap[string * string] -> (Content : er) *)
-let rec ltrcbv_etape_rec l map = 
-  let resu = Content { status = "KO" ; rmem = map ; res = l } in
-  match l with
-  | Application { fpos = f; apos = a } -> (*158*)
-      (match ltrcbv_etape_rec f map with
-       | Content { status = "OK" ; res = r } -> (*160*) Content { status = "OK" ; res = (capp r a) ; rmem = map } (*161*)
-       | Content { res = r } (*164*) -> 
-           (match (f, ltrcbv_etape_rec a map) with (*165*)
-            | (_, Content { status = "OK" }) -> (*166*) Content { status = "OK" ; res = (capp f r) ; rmem = map }
-            | (Lambda { vari = v ; corps = c }, _) -> Content { status = "OK" ; res = (instantie c v a) ; rmem = map }
-            | (Application { fpos = f2 ; apos = a2 }, _) -> (* rien \o/ *) Content { status = "OK" ; res = l ; rmem = map }
-            | _ -> resu
-           )
-      )
-  | _ -> resu
-;;
-
-(* er -> int -> lambda_terme *)
-let rec ltrcbv_etape_loop er eval =
-  match (er, eval) with
-  | (Content er, 1000) -> Format.printf "%s" "*** STOP : Trop de réductions ***" ; er.res
-  | (Content er, _) ->
-      let eval = eval + 1 in
-      let nouveau = ltrcbv_etape_rec er.res er.rmem in 
-      match nouveau with
-      | Content { status = "KO" } -> er.res
-      | Content { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau eval
-
-(* lambda_terme -> lambda_terme *)
-let ltrcbv_etape l = 
-  let l_barendregt = (barendregt l) in
-  let map = RempMap.empty in
-  Format.printf "%s" (print_lterme l_barendregt) ;
-  let nouveau = ltrcbv_etape_rec l_barendregt map in 
-  match nouveau with
-  | Content { status = "KO" } -> l
-  | Content { res = r ; rmem = rm } -> Format.printf "→%s" (print_lterme r) ; ltrcbv_etape_loop nouveau 0
-;;
-
-
-(* === === === Exemple *)
+(* === === === Exemple Left-to-Right Call-by-Value *)
 
 (* a2 : (λx.(x y)) (λx.x) *)
 ltrcbv_etape a2 ;;
@@ -209,13 +114,7 @@ let t2_app2 = ctarr t2_app1 t2_var3 empty_str ;;
 print_syntax t2_app2 ;;
 
 
-(* syntaxe -> syntaxe -> bool *)
-let rec stype_egal (t1 : syntaxe) (t2 : syntaxe) = match (t1, t2) with
-  | (Value v1, Value v2) -> v1 = v2
-  | (Lambda { tres = r1 }, Lambda { tres = r2 }) -> stype_egal r1 r2
-  | (Application { targ = a1 ; tres = r1 }, Application { targ = a2 ; tres = r2 }) -> (stype_egal a1 a2) && (stype_egal r1 r2)
-  | (_, _) -> false
-;;
+(* Voir stype_egal dans types.ml *)
 
 (* === === === Exemples *)
 
@@ -229,57 +128,12 @@ stype_egal t2_var1 t2_var1 ;; (* True *)
 
 (* === === === Exo 2.4 *)
 
-let tvar_counter = ref 0 ;;
-
-(* () -> string *)
-let fresh_tvar () = 
-  tvar_counter := !tvar_counter + 1 ;
-  "T" ^ string_of_int(!tvar_counter) 
-;;
-
-  
-
-(* string ->  StypeMap[string * Stype] -> StypeMap[string * Stype] -> StypeMap[string * Stype] *)
-let envi_fold_func key map acc = (StypeMap.add key (StypeMap.find key map) acc)
-
-(* StypeMap[string * Stype] -> lambda_terme -> syntaxe -> unif_res *)
-let rec gen_equas_rec map (l : lambda_terme) s =
-  match l with
-  | Value v -> (
-      try 
-        let resu = (StypeMap.find v map) in Ur { res = [(Tequa { tg = resu ; td = s })] ; status = "GSUCCES" ; cause = "" } 
-      with 
-        Not_found -> Ur { res = [](*Tequa*) ; status = "GECHEC" ; cause = "Pas de " ^ v ^ " dans l'environnement de typage." }
-    )
-  | Lambda { vari = v ; corps = c } -> 
-      let ta = cSvar (fresh_tvar ()) in
-      let tr = cSvar (fresh_tvar ()) in
-      let _ = debug ((print_syntax ta) ^ " = " ^ v ^ "\n" ^ (print_syntax tr) ^ " = " ^ (print_lterme c)) in
-      let map2 = StypeMap.add v ta map in (* est ce qu'il faut pas faire un remplacement si y a déjà qqch à cette clé ? *)
-      let Ur resu1 = gen_equas_rec map2 c tr in
-      if resu1.status = "GECHEC" 
-      then Ur resu1
-      else Ur { res = Tequa { tg = s ; td = (ctarr ta tr empty_str) } :: resu1.res ; status = "GSUCCES" ; cause = "" }
-  | Application { fpos = f ; apos = a }  -> 
-      let ta = cSvar (fresh_tvar ()) in
-      let _ = debug ((print_syntax ta) ^ " = " ^ (print_lterme a) ^ "\n" ^ (print_syntax (ctarr ta s empty_str)) ^ " = " ^ (print_lterme f)) in
-      let envi1 = StypeMap.fold envi_fold_func StypeMap.empty map in 
-      let envi2 = StypeMap.fold envi_fold_func StypeMap.empty map in
-      let Ur resuf = gen_equas_rec envi1 f (ctarr ta s empty_str) in
-      let Ur resua = gen_equas_rec envi2 a ta in
-      if resuf.status = "GECHEC" then Ur resuf else 
-      if resua.status = "GECHEC" then Ur resua else 
-        let equaf = resuf.res in
-        let equaa = resua.res in
-        Ur { res = (List.append equaf equaa) ; status = "GSUCCES" ; cause = "" }
-;;
-
-(* RempMap[string * Stype] -> lambda_terme -> s -> []Tequa *)
-let gen_equas map l s = let Ur ur = gen_equas_rec map l s in ur.res
-;;
+(* Voir toutes les fonctions dans typeur.ml *)
 
 
 (* === === === Exo 2.5 *)
+
+let guess = cSvar "???" ;;
 
 #use "unification.ml" ;;
 (* occur_check :        string -> stype -> bool *)
@@ -321,17 +175,39 @@ let ex_s = clam "x" (clam "y" (clam "z" (capp (capp (cvar "x") (cvar "z")) (capp
 (* SKK *)
 let ex_skk = capp (capp ex_s ex_k) ex_k ;;
 
+(* d *)
+let ex_delta = clam "x" (capp (cvar "x") (cvar "x")) ;;
+
+(* OM *)
+let ex_om = capp ex_delta ex_delta ;;
+
+(* KII *)
+let ex_kii = capp (capp ex_k ex_id) ex_id ;;
+
+(* triple *)
+let ex_triple = clam "x" (capp (capp (cvar "x") (cvar "x")) (cvar "x")) ;;
+
+(* KSK *)
+let ex_kii = capp (capp ex_k ex_s) ex_k ;;
+
 
 (* SKK : ((λx.λy.λz.((x z) (y z)) λx.λy.x) λx.λy.x) *)
-debug (print_typage_res (typeur ex_skk)) ;;
+(* debug (print_typage_res (typeur ex_skk)) ;; *)
+
+(* OM : (λx.(x x) λx.(x x)) *)
+(* debug (print_typage_res (typeur ex_om)) ;; *)
+
+(* KII : ((λx.λy.x λx.x) λx.x) *)
+(* debug (print_typage_res (typeur ex_kii)) ;; *)
+
+(* triple : (λx.(x x) λx.(x x)) *)
+(* debug (print_typage_res (typeur ex_triple)) ;; *)
+
+(* KSK : ((λx.λy.x λx.λy.λz.((x z) (y z))) λx.λy.x) *)
+(* debug (print_typage_res (typeur ex_kii)) ;; *)
 
 
 
 
-let liste = get_last_poped_to_i [5;6;7;1;9;4] 3 ;;
-debug (String.concat " " (List.map string_of_int liste)) ;;
-
-let nth = get_nth [5;6;7;1;9;4] 2 ;;
-debug (string_of_int nth) ;;
 
 Format.printf "\n" ;;
